@@ -132,6 +132,23 @@ export const pageViews = pgTable(
   })
 )
 
+export const newsletterSubscribers = pgTable(
+  'newsletter_subscribers',
+  {
+    id: serial('id').primaryKey(),
+    email: text('email').unique().notNull(),
+    status: text('status', { enum: ['active', 'unsubscribed'] })
+      .notNull()
+      .default('active'),
+    subscribed_at: timestamp('subscribed_at').notNull().default(sql`now()`),
+    unsubscribed_at: timestamp('unsubscribed_at'),
+  },
+  (t) => ({
+    emailIdx: index('newsletter_email_idx').on(t.email),
+    statusIdx: index('newsletter_status_idx').on(t.status),
+  })
+)
+
 export const automationConfig = pgTable('automation_config', {
   id: serial('id').primaryKey(),
   enabled: boolean('enabled').notNull().default(false),
@@ -185,3 +202,5 @@ export type PageView = typeof pageViews.$inferSelect
 export type NewPageView = typeof pageViews.$inferInsert
 export type AutomationConfig = typeof automationConfig.$inferSelect
 export type NewAutomationConfig = typeof automationConfig.$inferInsert
+export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect
+export type NewNewsletterSubscriber = typeof newsletterSubscribers.$inferInsert

@@ -36,6 +36,19 @@ const putSchema = z.object({
       social_youtube: z.string().max(200).optional(),
     })
     .optional(),
+  ai: z
+    .object({
+      api_key: z.string().optional(),
+      models: z.record(z.string()).optional(),
+    })
+    .optional(),
+  newsletter: z
+    .object({
+      enabled: z.boolean().optional(),
+      title: z.string().max(200).optional(),
+      subtitle: z.string().max(500).optional(),
+    })
+    .optional(),
 })
 
 export async function GET() {
@@ -59,7 +72,7 @@ export async function PUT(request: Request) {
       )
     }
 
-    const { template, colors, company } = parsed.data
+    const { template, colors, company, ai, newsletter } = parsed.data
     const now = new Date()
 
     if (template !== undefined) {
@@ -85,6 +98,32 @@ export async function PUT(request: Request) {
         .insert(siteSettings)
         .values({ key: 'company_info', value: companyJson, updated_at: now })
         .onConflictDoUpdate({ target: siteSettings.key, set: { value: companyJson, updated_at: now } })
+    }
+
+    if (ai !== undefined) {
+      if (ai.api_key !== undefined) {
+        await db
+          .insert(siteSettings)
+          .values({ key: 'ai_api_key', value: ai.api_key, updated_at: now })
+          .onConflictDoUpdate({ target: siteSettings.key, set: { value: ai.api_key, updated_at: now } })
+      }
+      if (ai.models !== undefined) {
+        const modelsJson = JSON.stringify(ai.models)
+        await db
+          .insert(siteSettings)
+          .values({ key: 'ai_models', value: modelsJson, updated_at: now })
+          .onConflictDoUpdate({ target: siteSettings.key, set: { value: modelsJson, updated_at: now } })
+      }
+    }
+
+    if (newsletter !== undefined) {
+      const current = await getSettings()
+      const merged = { ...current.newsletter, ...newsletter }
+      const newsletterJson = JSON.stringify(merged)
+      await db
+        .insert(siteSettings)
+        .values({ key: 'newsletter_config', value: newsletterJson, updated_at: now })
+        .onConflictDoUpdate({ target: siteSettings.key, set: { value: newsletterJson, updated_at: now } })
     }
 
     const current = await getSettings()

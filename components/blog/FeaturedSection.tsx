@@ -18,7 +18,7 @@ interface Props {
 export function FeaturedSection({ posts }: Props) {
   if (posts.length === 0) return null
 
-  const [featured, second, third] = posts
+  const [featured, ...secondaries] = posts
 
   return (
     <section className="mb-10">
@@ -31,7 +31,7 @@ export function FeaturedSection({ posts }: Props) {
           <PostCardBusiness post={featured} variant="featured" />
         </div>
         <div className="lg:col-span-2 flex flex-col gap-4">
-          {[second, third].filter(Boolean).map((post) => (
+          {secondaries.filter(Boolean).map((post) => (
             <PostCardBusiness key={post.id} post={post} variant="secondary" />
           ))}
         </div>

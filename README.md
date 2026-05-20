@@ -5,9 +5,10 @@ Blog corporativo da MMA Sistemas — Next.js 14 + Drizzle ORM + SQLite.
 ## Stack
 
 - **Framework:** Next.js 14 (App Router)
-- **Banco de dados:** SQLite via `better-sqlite3` + Drizzle ORM
+- **Banco de dados:** PostgreSQL (Supabase) via Drizzle ORM
 - **Autenticação:** JWT (jose) em cookie httpOnly
 - **Editor:** Tiptap (rich text)
+- **IA:** OpenRouter (https://openrouter.ai) — todos os recursos de IA usam modelos via OpenRouter. Chave de API e modelos por recurso configurados no painel admin em Configurações → IA.
 - **Estilo:** Tailwind CSS com design system MMA Sistemas
 
 ## Setup

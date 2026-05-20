@@ -8,7 +8,6 @@ import { Pagination } from '@/components/ui/Pagination'
 import { getSettings } from '@/lib/settings'
 import { FeaturedSection } from '@/components/blog/FeaturedSection'
 import { PostCardBusiness } from '@/components/blog/PostCardBusiness'
-import { NewsletterSection } from '@/components/blog/NewsletterSection'
 import { CategorySection } from '@/components/blog/CategorySection'
 import { NewsSidebar } from '@/components/blog/NewsSidebar'
 import { db } from '@/drizzle/db'
@@ -149,8 +148,8 @@ export default async function HomePage({
   }
 
   if (template === 'business') {
-    const [p1, p2, p3, ...rest] = postsData.posts
-    const featuredPosts = [p1, p2, p3].filter(Boolean)
+    const [p1, p2, p3, p4, ...rest] = postsData.posts
+    const featuredPosts = [p1, p2, p3, p4].filter(Boolean)
     return (
       <div>
         <FeaturedSection posts={featuredPosts} />
@@ -167,7 +166,6 @@ export default async function HomePage({
             </div>
           </div>
         )}
-        <NewsletterSection />
         <Suspense>
           <Pagination currentPage={postsData.page} totalPages={postsData.pages} />
         </Suspense>

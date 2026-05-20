@@ -107,7 +107,7 @@ export default function NovoArtigoPage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Imagem de Capa</label>
-            <ImageUpload value={coverImage} onChange={setCoverImage} />
+            <ImageUpload value={coverImage} onChange={setCoverImage} aiContext={{ title, excerpt, content }} />
           </div>
 
           <div>

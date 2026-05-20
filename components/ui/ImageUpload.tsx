@@ -6,10 +6,20 @@ interface ImageUploadProps {
   value: string
   onChange: (url: string) => void
   variant?: 'image' | 'logo'
+  aiContext?: { title: string; excerpt?: string; content?: string }
 }
 
-export function ImageUpload({ value, onChange, variant = 'image' }: ImageUploadProps) {
+function SparkleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z" />
+    </svg>
+  )
+}
+
+export function ImageUpload({ value, onChange, variant = 'image', aiContext }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false)
+  const [generatingAI, setGeneratingAI] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -27,6 +37,32 @@ export function ImageUpload({ value, onChange, variant = 'image' }: ImageUploadP
       setError('Erro de conexão')
     } finally {
       setUploading(false)
+    }
+  }
+
+  async function handleAIGenerate() {
+    if (!aiContext?.title) {
+      setError('Preencha o título do artigo antes de gerar a imagem')
+      return
+    }
+    setError('')
+    setGeneratingAI(true)
+    try {
+      const res = await fetch('/api/admin/ai/image/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(aiContext),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Erro ao gerar imagem')
+        return
+      }
+      onChange(data.url)
+    } catch {
+      setError('Erro de conexão ao gerar imagem')
+    } finally {
+      setGeneratingAI(false)
     }
   }
 
@@ -85,6 +121,30 @@ export function ImageUpload({ value, onChange, variant = 'image' }: ImageUploadP
               <span className="text-2xl">🖼️</span>
               <span className="text-xs font-medium">Clique para fazer upload</span>
               <span className="text-xs">JPG, PNG, WebP · Máx. 5MB</span>
+            </>
+          )}
+        </button>
+      )}
+
+      {aiContext && (
+        <button
+          type="button"
+          onClick={handleAIGenerate}
+          disabled={generatingAI || !aiContext.title}
+          className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-brand-primary text-brand-primary hover:bg-brand-primary-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {generatingAI ? (
+            <>
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Gerando imagem...
+            </>
+          ) : (
+            <>
+              <SparkleIcon className="h-4 w-4" />
+              Gerar Imagem com IA
             </>
           )}
         </button>

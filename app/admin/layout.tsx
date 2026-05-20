@@ -6,10 +6,12 @@ import { getSettings } from '@/lib/settings'
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: '📊' },
+  { href: '/admin/analytics', label: 'Analytics', icon: '📈' },
   { href: '/admin/artigos', label: 'Artigos', icon: '📝' },
   { href: '/admin/categorias', label: 'Categorias', icon: '🗂️' },
   { href: '/admin/tags', label: 'Tags', icon: '🏷️' },
   { href: '/admin/api', label: 'API', icon: '🔑' },
+  { href: '/admin/newsletter', label: 'Newsletter', icon: '✉️' },
   { href: '/admin/aparencia', label: 'Aparência', icon: '🎨' },
   { href: '/admin/configuracoes', label: 'Configurações', icon: '⚙️' },
 ]

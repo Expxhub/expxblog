@@ -3,6 +3,7 @@ import { PortalHeader } from '@/components/layout/PortalHeader'
 import { BusinessHeader } from '@/components/layout/BusinessHeader'
 import { NewsHeader } from '@/components/layout/NewsHeader'
 import { Footer } from '@/components/layout/Footer'
+import { NewsletterSection } from '@/components/blog/NewsletterSection'
 import { getSettings } from '@/lib/settings'
 import type { Metadata } from 'next'
 
@@ -19,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
-  const { template, company } = await getSettings()
+  const { template, company, newsletter } = await getSettings()
   const blogName = company.blog_name || process.env.NEXT_PUBLIC_BLOG_NAME || 'Blog'
   const logoUrl = company.logo_url
 
@@ -42,6 +43,15 @@ export default async function PublicLayout({ children }: { children: React.React
       >
         {children}
       </main>
+      {newsletter.enabled && (
+        <div className={`w-full mx-auto px-4 ${
+          template === 'portal' || template === 'business' || template === 'news'
+            ? 'max-w-7xl'
+            : 'max-w-6xl'
+        }`}>
+          <NewsletterSection title={newsletter.title} subtitle={newsletter.subtitle} />
+        </div>
+      )}
       <Footer
         blogName={blogName}
         companyName={company.company_name}

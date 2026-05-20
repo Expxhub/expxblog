@@ -24,10 +24,23 @@ export interface CompanyInfo {
   social_youtube: string
 }
 
+export interface NewsletterConfig {
+  enabled: boolean
+  title: string
+  subtitle: string
+}
+
+export const DEFAULT_NEWSLETTER: NewsletterConfig = {
+  enabled: false,
+  title: 'Fique por dentro das novidades',
+  subtitle: 'Receba os melhores artigos diretamente no seu e-mail.',
+}
+
 export interface SiteSettings {
   template: string
   colors: ThemeColors
   company: CompanyInfo
+  newsletter: NewsletterConfig
 }
 
 const COLOR_DEFAULTS: Record<string, ThemeColors> = {
@@ -111,8 +124,11 @@ export const getSettings = cache(async (): Promise<SiteSettings> => {
     const storedCompany = map['company_info'] ? (JSON.parse(map['company_info']) as Partial<CompanyInfo>) : {}
     const company: CompanyInfo = { ...DEFAULT_COMPANY, ...storedCompany }
 
-    return { template, colors, company }
+    const storedNewsletter = map['newsletter_config'] ? (JSON.parse(map['newsletter_config']) as Partial<NewsletterConfig>) : {}
+    const newsletter: NewsletterConfig = { ...DEFAULT_NEWSLETTER, ...storedNewsletter }
+
+    return { template, colors, company, newsletter }
   } catch {
-    return { template: 'default', colors: defaultColors('default'), company: DEFAULT_COMPANY }
+    return { template: 'default', colors: defaultColors('default'), company: DEFAULT_COMPANY, newsletter: DEFAULT_NEWSLETTER }
   }
 })
