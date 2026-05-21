@@ -62,7 +62,8 @@ export async function GET() {
   try {
     const settings = await getSettings()
     return NextResponse.json(settings)
-  } catch {
+  } catch (err) {
+    console.error('[settings GET] error:', err)
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
@@ -73,6 +74,7 @@ export async function PUT(request: Request) {
     const parsed = putSchema.safeParse(body)
 
     if (!parsed.success) {
+      console.error('[settings PUT] validation error:', JSON.stringify(parsed.error.flatten()))
       return NextResponse.json(
         { error: 'Dados inválidos', details: parsed.error.flatten() },
         { status: 400 }
@@ -155,7 +157,8 @@ export async function PUT(request: Request) {
 
     const current = await getSettings()
     return NextResponse.json(current)
-  } catch {
+  } catch (err) {
+    console.error('[settings PUT] error:', err)
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
