@@ -76,7 +76,10 @@ export function createPipelineStream(options: PipelineOptions): ReadableStream {
           // non-fatal: continue with no links
         } else {
           Object.assign(ctx, researchResult.data)
-          send(makeEvent('agent_done', researchResult.message, 'researcher', { count: ctx.researchLinks?.length }))
+          const msg = researchResult.error
+            ? `${researchResult.message} — resposta do modelo: ${researchResult.error}`
+            : researchResult.message
+          send(makeEvent('agent_done', msg, 'researcher', { count: ctx.researchLinks?.length }))
         }
 
         // 3. Analyst
