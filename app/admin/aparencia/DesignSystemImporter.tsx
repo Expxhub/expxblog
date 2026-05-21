@@ -13,41 +13,138 @@ interface ExtractedTokens {
   source_url: string
 }
 
-function mapCustomPropertiesToDS(props: Record<string, string>): Partial<DesignSystem> {
-  const mapped: Partial<DesignSystem> = {}
+// Resolve var(--name) references one level deep
+function resolveVarRef(value: string, props: Record<string, string>): string {
+  const varMatch = /^var\((--[\w-]+)\)$/.exec(value.trim())
+  if (varMatch) return props[varMatch[1]]?.trim() ?? value
+  return value.trim()
+}
 
-  const tryMap = (prop: string, key: keyof DesignSystem) => {
-    if (props[prop]) (mapped as Record<string, string>)[key] = props[prop]
+function parsePx(v: string): number {
+  if (v.endsWith('px')) return parseFloat(v)
+  if (v.endsWith('rem')) return parseFloat(v) * 16
+  if (v.endsWith('em')) return parseFloat(v) * 16
+  return NaN
+}
+
+function mapTokensToDS(
+  props: Record<string, string>,
+  fontFamilies: string[],
+  colors: string[],
+  borderRadii: string[],
+  fontSizes: string[],
+): Partial<DesignSystem> {
+  const mapped: Partial<DesignSystem> = {}
+  const set = (key: keyof DesignSystem, val: string) => {
+    if (val) (mapped as Record<string, string>)[key] = val
   }
 
-  tryMap('--font-family-base', 'font_sans')
-  tryMap('--font-family-sans', 'font_sans')
-  tryMap('--font-family-heading', 'font_serif')
-  tryMap('--font-family-mono', 'font_mono')
-  tryMap('--font-size-base', 'font_size_base')
-  tryMap('--font-size-sm', 'font_size_sm')
-  tryMap('--font-size-lg', 'font_size_lg')
-  tryMap('--font-size-xl', 'font_size_xl')
-  tryMap('--font-size-2xl', 'font_size_2xl')
-  tryMap('--font-size-3xl', 'font_size_3xl')
-  tryMap('--line-height-base', 'line_height_base')
-  tryMap('--font-weight-normal', 'font_weight_normal')
-  tryMap('--font-weight-medium', 'font_weight_medium')
-  tryMap('--font-weight-bold', 'font_weight_bold')
-  tryMap('--spacing-base', 'spacing_base')
-  tryMap('--radius-sm', 'radius_sm')
-  tryMap('--radius-md', 'radius_md')
-  tryMap('--radius-lg', 'radius_lg')
-  tryMap('--radius-full', 'radius_full')
-  tryMap('--color-text-primary', 'color_text_primary')
-  tryMap('--color-text-secondary', 'color_text_secondary')
-  tryMap('--color-border', 'color_border')
-  tryMap('--color-error', 'color_error')
-  tryMap('--color-success', 'color_success')
-  tryMap('--color-warning', 'color_warning')
-  tryMap('--text-primary', 'color_text_primary')
-  tryMap('--text-secondary', 'color_text_secondary')
-  tryMap('--color-danger', 'color_error')
+  // ── Fonts ──────────────────────────────────────────────────────────────
+  // 1. Look for vars with "body"/"sans"/"text" in name → font_sans
+  // 2. Look for vars with "display"/"heading"/"serif"/"title" → font_serif
+  // 3. Look for vars with "mono"/"code" → font_mono
+  // 4. Fall back to font-family declarations from CSS
+  const fontVars = Object.entries(props).filter(([k]) => /font/i.test(k))
+
+  const bodyVar = fontVars.find(([k]) => /body|sans|text|base/i.test(k))
+  const headingVar = fontVars.find(([k]) => /display|heading|serif|title|hero/i.test(k))
+  const monoVar = fontVars.find(([k]) => /mono|code/i.test(k))
+
+  if (bodyVar) set('font_sans', resolveVarRef(bodyVar[1], props))
+  else if (fontFamilies[0]) set('font_sans', resolveVarRef(fontFamilies[0], props))
+
+  if (headingVar) set('font_serif', resolveVarRef(headingVar[1], props))
+  else if (fontFamilies[1]) set('font_serif', resolveVarRef(fontFamilies[1], props))
+
+  if (monoVar) set('font_mono', resolveVarRef(monoVar[1], props))
+
+  // ── Font sizes ─────────────────────────────────────────────────────────
+  // Try named vars first, then fall back to sorted font-size list
+  const sizeKeys: [RegExp, keyof DesignSystem][] = [
+    [/font-size-sm|size-sm|text-sm/i, 'font_size_sm'],
+    [/font-size-base|size-base|size-md|text-base/i, 'font_size_base'],
+    [/font-size-lg|size-lg|text-lg/i, 'font_size_lg'],
+    [/font-size-xl|size-xl|text-xl/i, 'font_size_xl'],
+    [/font-size-2xl|size-2xl|text-2xl/i, 'font_size_2xl'],
+    [/font-size-3xl|size-3xl|text-3xl/i, 'font_size_3xl'],
+  ]
+  for (const [pattern, dsKey] of sizeKeys) {
+    const found = Object.entries(props).find(([k]) => pattern.test(k))
+    if (found) set(dsKey, resolveVarRef(found[1], props))
+  }
+
+  // Fill remaining from sorted font-sizes
+  const sortedSizes = [...fontSizes]
+    .map(v => ({ v, px: parsePx(v) }))
+    .filter(x => !isNaN(x.px))
+    .sort((a, b) => a.px - b.px)
+    .map(x => x.v)
+
+  const sizeSlots: (keyof DesignSystem)[] = ['font_size_sm', 'font_size_base', 'font_size_lg', 'font_size_xl', 'font_size_2xl', 'font_size_3xl']
+  if (sortedSizes.length >= 3) {
+    // pick 6 evenly spaced entries from the sorted list
+    const step = Math.max(1, Math.floor(sortedSizes.length / 6))
+    sizeSlots.forEach((slot, i) => {
+      if (!mapped[slot]) {
+        const candidate = sortedSizes[Math.min(i * step, sortedSizes.length - 1)]
+        if (candidate) set(slot, candidate)
+      }
+    })
+  }
+
+  // ── Border radii ───────────────────────────────────────────────────────
+  const radiusKeys: [RegExp, keyof DesignSystem][] = [
+    [/radius-sm|rounded-sm/i, 'radius_sm'],
+    [/radius-md|radius-base|rounded-md/i, 'radius_md'],
+    [/radius-lg|rounded-lg/i, 'radius_lg'],
+    [/radius-full|radius-pill|rounded-full/i, 'radius_full'],
+  ]
+  for (const [pattern, dsKey] of radiusKeys) {
+    const found = Object.entries(props).find(([k]) => pattern.test(k))
+    if (found) set(dsKey, resolveVarRef(found[1], props))
+  }
+
+  // Fill from sorted border-radius values
+  const sortedRadii = [...borderRadii]
+    .filter(v => /^\d+(\.\d+)?(px|rem|em|%)$/.test(v))
+    .map(v => ({ v, px: parsePx(v.endsWith('%') ? '0px' : v) }))
+    .filter(x => !isNaN(x.px))
+    .sort((a, b) => a.px - b.px)
+    .map(x => x.v)
+
+  const radiiSlots: [keyof DesignSystem, number][] = [
+    ['radius_sm', 0], ['radius_md', 1], ['radius_lg', 2],
+  ]
+  for (const [slot, idx] of radiiSlots) {
+    if (!mapped[slot] && sortedRadii[idx]) set(slot, sortedRadii[idx])
+  }
+  // radius_full: prefer "50%" or highest px value
+  if (!mapped.radius_full) {
+    const full = borderRadii.find(v => v === '50%' || v === '9999px' || v === '100px' || /^[5-9]\d{2,}px/.test(v))
+    if (full) set('radius_full', full)
+    else if (sortedRadii.at(-1)) set('radius_full', sortedRadii.at(-1)!)
+  }
+
+  // ── Colors ─────────────────────────────────────────────────────────────
+  // Named var heuristics
+  const colorEntries = Object.entries(props).filter(([, v]) => /^#[0-9A-Fa-f]{3,6}$/.test(v.trim()))
+
+  const find = (pattern: RegExp) => colorEntries.find(([k]) => pattern.test(k))?.[1].trim()
+
+  const textPrimary = find(/text-primary|color-text$|foreground|fg$|body-color/i)
+    ?? find(/white|light/i)
+  const textSecondary = find(/text-secondary|text-muted|gray-[123]\d\d|muted/i)
+  const borderColor = find(/border|divider|separator/i)
+  const errorColor = find(/error|danger|red/i)
+  const successColor = find(/success|green/i)
+  const warningColor = find(/warning|yellow|gold|orange/i)
+
+  if (textPrimary) set('color_text_primary', textPrimary)
+  if (textSecondary) set('color_text_secondary', textSecondary)
+  if (borderColor) set('color_border', borderColor)
+  if (errorColor) set('color_error', errorColor)
+  if (successColor) set('color_success', successColor)
+  if (warningColor) set('color_warning', warningColor)
 
   return mapped
 }
@@ -84,7 +181,17 @@ export function DesignSystemImporter({ onApply, onLogoApply }: Props) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Erro desconhecido')
       setExtracted(data as ExtractedTokens)
-      setMapped(mapCustomPropertiesToDS(data.custom_properties))
+      const tokens = mapTokensToDS(
+        data.custom_properties,
+        data.font_families,
+        data.colors,
+        data.border_radii,
+        data.font_sizes,
+      )
+      setMapped(tokens)
+      if (Object.keys(tokens).length > 0) {
+        onApply(tokens)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao extrair')
     } finally {
@@ -224,30 +331,27 @@ export function DesignSystemImporter({ onApply, onLogoApply }: Props) {
           )}
 
           {mappedCount > 0 ? (
-            <>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-xs">
-                <p className="font-semibold text-blue-800 mb-2">
-                  {mappedCount} token{mappedCount > 1 ? 's' : ''} mapeado{mappedCount > 1 ? 's' : ''} automaticamente
-                </p>
-                <ul className="space-y-1 text-blue-700">
-                  {Object.entries(mapped!).map(([k, v]) => (
-                    <li key={k}>
-                      <span className="font-mono">{k}</span>: <span>{v}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-xs">
+              <p className="font-semibold text-green-800 mb-2">
+                ✓ {mappedCount} token{mappedCount > 1 ? 's' : ''} aplicado{mappedCount > 1 ? 's' : ''} automaticamente
+              </p>
+              <ul className="space-y-1 text-green-700 columns-2">
+                {Object.entries(mapped!).map(([k, v]) => (
+                  <li key={k} className="truncate">
+                    <span className="font-mono">{k}</span>: <span>{v}</span>
+                  </li>
+                ))}
+              </ul>
               <button
                 onClick={handleApply}
-                className="w-full bg-brand-secondary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                className="mt-3 text-green-700 underline text-xs hover:text-green-900"
               >
-                Aplicar tokens ao design system
+                Re-aplicar tokens
               </button>
-            </>
+            </div>
           ) : (
             <p className="text-sm text-gray-500">
-              Nenhum token de design system padrão encontrado. O site pode usar nomes de variáveis
-              personalizados. Configure os tokens manualmente abaixo.
+              Nenhum token foi mapeado automaticamente. Configure os campos manualmente abaixo.
             </p>
           )}
         </div>
