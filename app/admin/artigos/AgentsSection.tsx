@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 type AgentId =
   | 'headline'
@@ -60,6 +60,8 @@ export default function AgentsSection() {
   const [generating, setGenerating] = useState<AgentId | null>(null)
   const [expandedAgent, setExpandedAgent] = useState<AgentId | null>(null)
   const [models, setModels] = useState<{ id: string; name: string }[]>([])
+  const [modelSearch, setModelSearch] = useState<Record<AgentId, string>>({} as Record<AgentId, string>)
+  const [modelDropdownOpen, setModelDropdownOpen] = useState<AgentId | null>(null)
   const [toast, setToast] = useState<Toast | null>(null)
 
   // Pipeline runner state
@@ -81,8 +83,9 @@ export default function AgentsSection() {
 
     fetch('/api/admin/ai/models')
       .then((r) => r.json())
-      .then((data: { models?: { id: string; name: string }[] }) => {
-        if (data.models) setModels(data.models)
+      .then((data: { id: string; name: string }[] | { models?: { id: string; name: string }[] }) => {
+        const list = Array.isArray(data) ? data : (data.models ?? [])
+        setModels(list)
       })
       .catch(() => {})
   }, [])
@@ -326,20 +329,55 @@ export default function AgentsSection() {
               {expandedAgent === cfg.id && (
                 <div className="p-4 space-y-4">
                   {/* Model selector */}
-                  <div>
+                  <div className="relative">
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Modelo LLM {cfg.supportsImageModel && <span className="text-blue-500">(suporta geração de imagem)</span>}
                     </label>
-                    <select
-                      value={cfg.model}
-                      onChange={(e) => updateConfig(cfg.id, { model: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    >
-                      {models.length > 0
-                        ? models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)
-                        : <option value={cfg.model}>{cfg.model}</option>
-                      }
-                    </select>
+                    <input
+                      type="text"
+                      value={modelDropdownOpen === cfg.id ? (modelSearch[cfg.id] ?? '') : (models.find(m => m.id === cfg.model)?.name ?? cfg.model)}
+                      onChange={(e) => {
+                        setModelSearch(prev => ({ ...prev, [cfg.id]: e.target.value }))
+                        setModelDropdownOpen(cfg.id)
+                      }}
+                      onFocus={() => {
+                        setModelSearch(prev => ({ ...prev, [cfg.id]: '' }))
+                        setModelDropdownOpen(cfg.id)
+                      }}
+                      onBlur={() => setTimeout(() => setModelDropdownOpen(null), 150)}
+                      placeholder="Buscar modelo..."
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    />
+                    {modelDropdownOpen === cfg.id && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {(models.length > 0
+                          ? models.filter(m => {
+                              const q = (modelSearch[cfg.id] ?? '').toLowerCase()
+                              return !q || m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
+                            })
+                          : [{ id: cfg.model, name: cfg.model }]
+                        ).slice(0, 50).map(m => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onMouseDown={() => {
+                              updateConfig(cfg.id, { model: m.id })
+                              setModelDropdownOpen(null)
+                            }}
+                            className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 truncate ${m.id === cfg.model ? 'bg-brand-primary/5 text-brand-primary font-medium' : 'text-gray-700'}`}
+                          >
+                            <span className="font-medium">{m.name}</span>
+                            <span className="text-gray-400 ml-1">{m.id}</span>
+                          </button>
+                        ))}
+                        {models.filter(m => {
+                          const q = (modelSearch[cfg.id] ?? '').toLowerCase()
+                          return !q || m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
+                        }).length === 0 && (
+                          <div className="px-3 py-2 text-xs text-gray-400">Nenhum modelo encontrado</div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Prompt editor */}
