@@ -74,6 +74,8 @@ export interface OpenRouterResponse {
     completion_tokens: number
     total_tokens: number
   }
+  // Perplexity/Sonar models return cited URLs here
+  citations?: string[]
 }
 
 function injectDateContext(messages: OpenRouterMessage[]): OpenRouterMessage[] {

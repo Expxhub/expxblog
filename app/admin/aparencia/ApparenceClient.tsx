@@ -470,7 +470,6 @@ export function ApparenceClient({ initial }: Props) {
 
   function handleTemplateChange(id: string) {
     setTemplate(id)
-    setColors(DEFAULT_COLORS[id] ?? DEFAULT_COLORS.default)
   }
 
   function handleColorChange(key: keyof ThemeColors, value: string) {

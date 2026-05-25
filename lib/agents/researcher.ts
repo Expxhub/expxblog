@@ -29,6 +29,24 @@ function extractUrls(text: string): string[] {
   return matches.slice(0, 8)
 }
 
+// Jina AI Search: returns real URLs from a web search query (no API key required)
+async function searchWithJina(query: string): Promise<string[]> {
+  try {
+    const resp = await fetch(`https://s.jina.ai/${encodeURIComponent(query)}`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (!resp.ok) return []
+    const data = await resp.json() as { data?: Array<{ url?: string }> }
+    return (data.data ?? [])
+      .map((r) => r.url)
+      .filter((u): u is string => typeof u === 'string' && u.startsWith('http'))
+      .slice(0, 8)
+  } catch {
+    return []
+  }
+}
+
 export async function runResearcherAgent(
   ctx: AgentContext,
   apiKey: string
@@ -37,24 +55,65 @@ export async function runResearcherAgent(
 
   const config = await getAgentConfig('researcher')
 
-  const resp = await callOpenRouter(
-    {
-      model: config.model,
-      messages: [
-        { role: 'system', content: config.prompt },
-        {
-          role: 'user',
-          content: `Título do artigo: ${ctx.headline}${ctx.themeTitle ? `\nTema: ${ctx.themeTitle}` : ''}\n\nResponda APENAS em JSON válido: { "urls": ["https://...", "https://...", ...] }`,
-        },
-      ],
-      temperature: 0.5,
-      max_tokens: 800,
-    },
-    apiKey
-  )
+  let suggestedUrls: string[] = []
+  let searchSource = 'LLM'
+  const isPerplexity = config.model.startsWith('perplexity/')
 
-  const raw = resp.choices[0]?.message?.content ?? ''
-  const suggestedUrls = extractUrls(raw)
+  if (isPerplexity) {
+    // Perplexity/Sonar: built-in web search — citations come back in resp.citations
+    const resp = await callOpenRouter(
+      {
+        model: config.model,
+        messages: [
+          { role: 'system', content: config.prompt },
+          {
+            role: 'user',
+            content: `Título do artigo: ${ctx.headline}${ctx.themeTitle ? `\nTema: ${ctx.themeTitle}` : ''}\n\nBusque as principais fontes sobre este tema e responda em JSON: { "urls": ["https://...", ...] }`,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 1000,
+      },
+      apiKey
+    )
+
+    const citations = resp.citations ?? []
+    const fromContent = extractUrls(resp.choices[0]?.message?.content ?? '')
+    const seen = new Set<string>()
+    suggestedUrls = [...citations, ...fromContent]
+      .filter((u) => (seen.has(u) ? false : (seen.add(u), true)))
+      .slice(0, 8)
+    searchSource = 'Perplexity Search'
+  } else {
+    // Standard model: Jina web search + LLM URL suggestions in parallel
+    const [llmResp, jinaUrls] = await Promise.all([
+      callOpenRouter(
+        {
+          model: config.model,
+          messages: [
+            { role: 'system', content: config.prompt },
+            {
+              role: 'user',
+              content: `Título do artigo: ${ctx.headline}${ctx.themeTitle ? `\nTema: ${ctx.themeTitle}` : ''}\n\nResponda APENAS em JSON válido: { "urls": ["https://...", "https://...", ...] }`,
+            },
+          ],
+          temperature: 0.5,
+          max_tokens: 800,
+        },
+        apiKey
+      ),
+      searchWithJina(ctx.headline),
+    ])
+
+    const llmUrls = extractUrls(llmResp.choices[0]?.message?.content ?? '')
+    // Jina results first (real URLs from the web), LLM suggestions fill remaining slots
+    const merged = [...jinaUrls]
+    for (const u of llmUrls) {
+      if (!merged.includes(u)) merged.push(u)
+    }
+    suggestedUrls = merged.slice(0, 8)
+    searchSource = jinaUrls.length > 0 ? `Jina Search (${jinaUrls.length} reais)` : 'LLM'
+  }
 
   // Merge with any links already seeded (e.g. from URL-based generation)
   const seeded = ctx.researchLinks ?? []
@@ -67,8 +126,8 @@ export async function runResearcherAgent(
 
   return {
     success: true,
-    message: `${researchLinks.length} referências identificadas`,
+    message: `${researchLinks.length} referências identificadas (${searchSource})`,
     data: { researchLinks },
-    ...(researchLinks.length === 0 ? { error: `Modelo retornou: ${raw.slice(0, 200)}` } : {}),
+    ...(researchLinks.length === 0 ? { error: 'Nenhuma referência encontrada' } : {}),
   }
 }

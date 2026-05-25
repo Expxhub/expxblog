@@ -33,7 +33,8 @@ export async function runCtaAgent(
     apiKey
   )
 
-  const ctaHtml = resp.choices[0]?.message?.content?.trim() ?? ''
+  const raw = resp.choices[0]?.message?.content?.trim() ?? ''
+  const ctaHtml = raw.replace(/^```(?:html)?\s*/i, '').replace(/\s*```$/, '').trim()
   const contentWithCta = `${ctx.articleContent}\n\n${ctaHtml}`
 
   return {
