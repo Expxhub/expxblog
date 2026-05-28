@@ -161,15 +161,6 @@ export interface OpenRouterModel {
   }
 }
 
-const IMAGE_MODELS: OpenRouterModel[] = [
-  { id: 'openai/gpt-5-image', name: 'OpenAI: GPT-5 Image', context_length: 0, pricing: { prompt: null, completion: null } },
-  { id: 'openai/gpt-5-image-mini', name: 'OpenAI: GPT-5 Image Mini', context_length: 0, pricing: { prompt: null, completion: null } },
-  { id: 'openai/gpt-5.4-image-2', name: 'OpenAI: GPT-5.4 Image 2', context_length: 0, pricing: { prompt: null, completion: null } },
-  { id: 'google/gemini-2.5-flash-image', name: 'Google: Gemini 2.5 Flash Image', context_length: 0, pricing: { prompt: null, completion: null } },
-  { id: 'google/gemini-3.1-flash-image-preview', name: 'Google: Gemini 3.1 Flash Image', context_length: 0, pricing: { prompt: null, completion: null } },
-  { id: 'google/gemini-3-pro-image-preview', name: 'Google: Gemini 3 Pro Image', context_length: 0, pricing: { prompt: null, completion: null } },
-]
-
 export async function fetchAvailableModels(): Promise<OpenRouterModel[]> {
   const response = await fetch('https://openrouter.ai/api/v1/models', {
     next: { revalidate: 3600 },
@@ -181,12 +172,26 @@ export async function fetchAvailableModels(): Promise<OpenRouterModel[]> {
 
   const data = (await response.json()) as { data: OpenRouterModel[] }
 
-  const chatModels = data.data.filter((m) => m.id && m.name)
+  return data.data
+    .filter((m) => m.id && m.name)
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
 
-  const chatIds = new Set(chatModels.map((m) => m.id))
-  const extraImageModels = IMAGE_MODELS.filter((m) => !chatIds.has(m.id))
+export async function fetchAvailableImageModels(): Promise<OpenRouterModel[]> {
+  const response = await fetch(
+    'https://openrouter.ai/api/v1/models?output_modalities=image',
+    { next: { revalidate: 3600 } }
+  )
 
-  return [...chatModels, ...extraImageModels].sort((a, b) => a.name.localeCompare(b.name))
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image models from OpenRouter (${response.status})`)
+  }
+
+  const data = (await response.json()) as { data: OpenRouterModel[] }
+
+  return data.data
+    .filter((m) => m.id && m.name)
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function aiChat(

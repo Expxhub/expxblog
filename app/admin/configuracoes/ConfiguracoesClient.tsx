@@ -99,15 +99,26 @@ export function ConfiguracoesClient({ initial, initialAI, initialTelegram, initi
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [activeSection, setActiveSection] = useState<SectionId>('blog')
   const [availableModels, setAvailableModels] = useState<RemoteModel[]>([])
+  const [availableImageModels, setAvailableImageModels] = useState<RemoteModel[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
   const [webhookLoading, setWebhookLoading] = useState(false)
 
+  const IMAGE_FEATURES = new Set(['image_generation'])
+
   useEffect(() => {
     setModelsLoading(true)
-    fetch('/api/admin/ai/models')
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data: RemoteModel[]) => setAvailableModels(data))
-      .catch(() => setAvailableModels([]))
+    Promise.all([
+      fetch('/api/admin/ai/models').then((res) => (res.ok ? res.json() : [])),
+      fetch('/api/admin/ai/image-models').then((res) => (res.ok ? res.json() : [])),
+    ])
+      .then(([chatModels, imageModels]: [RemoteModel[], RemoteModel[]]) => {
+        setAvailableModels(chatModels)
+        setAvailableImageModels(imageModels)
+      })
+      .catch(() => {
+        setAvailableModels([])
+        setAvailableImageModels([])
+      })
       .finally(() => setModelsLoading(false))
   }, [])
 
@@ -256,7 +267,7 @@ export function ConfiguracoesClient({ initial, initialAI, initialTelegram, initi
                       <ModelCombobox
                         value={model}
                         onChange={(v) => handleAIModelChange(feature, v)}
-                        models={availableModels}
+                        models={IMAGE_FEATURES.has(feature) ? availableImageModels : availableModels}
                         loading={modelsLoading}
                       />
                     </div>
