@@ -148,19 +148,23 @@ export function createPipelineStream(options: PipelineOptions): ReadableStream {
           send(makeEvent('agent_done', `Headline: "${ctx.headline}"`, 'headline', { headline: ctx.headline }))
         }
 
-        // 2. Researcher — seed with initialContext.researchLinks if provided
+        // 2. Researcher — skip if pastedText provided (text is already the source)
         if (aborted()) { send(makeEvent('pipeline_error', 'Pipeline interrompido pelo usuário')); controller.close(); return }
-        send(makeEvent('agent_start', 'Pesquisando referências na web...', 'researcher'))
-        const researchResult = await runResearcherAgent(ctx, apiKey)
-        if (!researchResult.success) {
-          send(makeEvent('agent_error', researchResult.message, 'researcher'))
-          // non-fatal: continue with no links
+        if (ctx.pastedText) {
+          send(makeEvent('agent_done', 'Texto colado fornecido, pesquisa na web ignorada', 'researcher'))
         } else {
-          Object.assign(ctx, researchResult.data)
-          const msg = researchResult.error
-            ? `${researchResult.message} — resposta do modelo: ${researchResult.error}`
-            : researchResult.message
-          send(makeEvent('agent_done', msg, 'researcher', { count: ctx.researchLinks?.length }))
+          send(makeEvent('agent_start', 'Pesquisando referências na web...', 'researcher'))
+          const researchResult = await runResearcherAgent(ctx, apiKey)
+          if (!researchResult.success) {
+            send(makeEvent('agent_error', researchResult.message, 'researcher'))
+            // non-fatal: continue with no links
+          } else {
+            Object.assign(ctx, researchResult.data)
+            const msg = researchResult.error
+              ? `${researchResult.message} — resposta do modelo: ${researchResult.error}`
+              : researchResult.message
+            send(makeEvent('agent_done', msg, 'researcher', { count: ctx.researchLinks?.length }))
+          }
         }
 
         // 3. Analyst
