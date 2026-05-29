@@ -16,6 +16,33 @@ export async function runHeadlineAgent(
   let themeTitle: string
   let themeDescription: string | null | undefined
 
+  if (ctx.pastedText) {
+    // Gera headline diretamente do texto colado — sem buscar tema no banco
+    log?.('texto colado disponível, gerando headline a partir do conteúdo...')
+    const config = await getAgentConfig('headline')
+    const resp = await callOpenRouter(
+      {
+        model: config.model,
+        messages: [
+          { role: 'system', content: config.prompt },
+          {
+            role: 'user',
+            content: `Crie um título de artigo baseado no texto abaixo. Responda APENAS com o título, sem aspas ou pontuação extra.\n\nTexto:\n${ctx.pastedText.slice(0, 2000)}`,
+          },
+        ],
+        temperature: 0.8,
+        max_tokens: 120,
+      },
+      apiKey
+    )
+    const headline = resp.choices[0]?.message?.content?.trim() ?? 'Artigo gerado a partir de texto'
+    return {
+      success: true,
+      message: `Headline gerada: "${headline}"`,
+      data: { headline },
+    }
+  }
+
   if (ctx.themeTitle) {
     // Theme data already in context — skip DB query
     log?.('tema disponível no contexto, pulando busca no banco...')
