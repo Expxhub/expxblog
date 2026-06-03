@@ -30,6 +30,7 @@ export async function runAnalystAgent(
       const resp = await callOpenRouter(
         {
           model: config.model,
+          feature: 'content_generation',
           messages: [
             { role: 'system', content: config.prompt },
             {
@@ -91,6 +92,7 @@ export async function runAnalystAgent(
       const resp = await callOpenRouter(
         {
           model: config.model,
+          feature: 'content_generation',
           messages: [
             { role: 'system', content: config.prompt },
             {

@@ -298,7 +298,9 @@ export async function callOpenRouterImage(
   const maxAttempts = 3
   const signal = AbortSignal.timeout(180_000)
   let response!: Response
+  let attemptStartedAt = Date.now()
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    attemptStartedAt = Date.now()
     response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       signal,
@@ -326,11 +328,33 @@ export async function callOpenRouterImage(
     }
 
     const errorBody = await response.text()
+    void persistAiLog({
+      feature: 'image_generation',
+      model: resolvedModel,
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      cost_usd: 0,
+      status: 'error',
+      error: `HTTP ${response.status}`,
+      duration_ms: Date.now() - attemptStartedAt,
+    })
     throw new Error(`OpenRouter Image API error (${response.status}): ${errorBody}`)
   }
 
   if (!response.ok) {
     const errorBody = await response.text()
+    void persistAiLog({
+      feature: 'image_generation',
+      model: resolvedModel,
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      cost_usd: 0,
+      status: 'error',
+      error: `HTTP ${response.status}`,
+      duration_ms: Date.now() - attemptStartedAt,
+    })
     throw new Error(`OpenRouter Image API error (${response.status}): ${errorBody}`)
   }
 
@@ -341,7 +365,21 @@ export async function callOpenRouterImage(
         images?: Array<{ image_url?: { url: string }; url?: string }>
       }
     }[]
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number }
   }
+
+  const promptTokens = data.usage?.prompt_tokens ?? 0
+  const completionTokens = data.usage?.completion_tokens ?? 0
+  void persistAiLog({
+    feature: 'image_generation',
+    model: resolvedModel,
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: data.usage?.total_tokens ?? (promptTokens + completionTokens),
+    cost_usd: data.usage?.cost ?? 0,
+    status: 'success',
+    duration_ms: Date.now() - attemptStartedAt,
+  })
 
   const msg = data.choices?.[0]?.message
 

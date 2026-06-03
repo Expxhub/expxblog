@@ -36,6 +36,7 @@ Mínimo de ${articleConfig.minWords} palavras. Responda em JSON (sem markdown): 
   const resp = await callOpenRouter(
     {
       model: config.model,
+      feature: 'content_generation',
       messages: [
         { role: 'system', content: config.prompt },
         { role: 'user', content: userMsg },
@@ -97,6 +98,7 @@ Responda SOMENTE com JSON válido (sem markdown, sem texto fora do JSON):
   const resp = await callOpenRouter(
     {
       model: config.model,
+      feature: 'content_generation',
       messages: [
         {
           role: 'system',

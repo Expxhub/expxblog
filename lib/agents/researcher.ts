@@ -74,6 +74,7 @@ export async function runResearcherAgent(
     const resp = await callOpenRouter(
       {
         model: config.model,
+        feature: 'content_generation',
         messages: [
           { role: 'system', content: config.prompt },
           {
@@ -100,6 +101,7 @@ export async function runResearcherAgent(
       callOpenRouter(
         {
           model: config.model,
+          feature: 'content_generation',
           messages: [
             { role: 'system', content: config.prompt },
             {

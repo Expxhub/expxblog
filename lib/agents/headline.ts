@@ -23,6 +23,7 @@ export async function runHeadlineAgent(
     const resp = await callOpenRouter(
       {
         model: config.model,
+        feature: 'content_generation',
         messages: [
           { role: 'system', content: config.prompt },
           {
@@ -118,6 +119,7 @@ export async function runHeadlineAgent(
   const resp = await callOpenRouter(
     {
       model: config.model,
+      feature: 'content_generation',
       messages: [
         { role: 'system', content: config.prompt },
         { role: 'user', content: userMsg },

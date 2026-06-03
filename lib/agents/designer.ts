@@ -1,10 +1,12 @@
 // lib/agents/designer.ts
-import { callOpenRouter, callOpenRouterImage } from '@/lib/ai'
+import { aiChat, callOpenRouterImage } from '@/lib/ai'
 import { getAgentConfig } from '@/lib/agent-configs'
 import { getAgentsExtra } from '@/lib/firecrawl'
 import { getPexelsApiKey, searchPexelsPhoto } from '@/lib/pexels'
 import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase-admin'
 import { AgentContext, AgentResult } from '@/lib/agents/types'
+
+const NO_TEXT_SUFFIX = '. No text, no letters, no words, no numbers anywhere in the image.'
 
 export async function runDesignerAgent(
   ctx: AgentContext,
@@ -16,24 +18,19 @@ export async function runDesignerAgent(
   const extra = await getAgentsExtra()
   const imageSource = extra['designer']?.image_source ?? 'ai'
 
-  // Generate a text prompt/query using a cheap text model
-  const promptResp = await callOpenRouter(
-    {
-      model: 'openai/gpt-4o-mini',
-      messages: [
-        { role: 'system', content: config.prompt },
-        {
-          role: 'user',
-          content: `Título: ${ctx.articleTitle}\nResumo: ${ctx.articleExcerpt ?? ''}`,
-        },
-      ],
-      temperature: 0.8,
-      max_tokens: 300,
-    },
-    apiKey
+  const rawPrompt = await aiChat(
+    'prompt_generation',
+    [
+      { role: 'system', content: config.prompt },
+      {
+        role: 'user',
+        content: `Título: ${ctx.articleTitle}\nResumo: ${ctx.articleExcerpt ?? ''}`,
+      },
+    ],
+    { temperature: 0.8, max_tokens: 300 }
   )
 
-  const generatedText = promptResp.choices[0]?.message?.content?.trim() ?? ctx.articleTitle
+  const generatedText = rawPrompt.trim() || ctx.articleTitle
 
   let imageBuffer: Buffer
   let contentType = 'image/jpeg'
@@ -54,8 +51,7 @@ export async function runDesignerAgent(
     contentType = imgRes.headers.get('content-type') ?? 'image/jpeg'
     imageBuffer = Buffer.from(await imgRes.arrayBuffer())
   } else {
-    // AI image generation via OpenRouter
-    const imageUrl = await callOpenRouterImage(generatedText, config.model, apiKey)
+    const imageUrl = await callOpenRouterImage(generatedText + NO_TEXT_SUFFIX, config.model, apiKey)
 
     if (imageUrl.startsWith('data:')) {
       const matches = imageUrl.match(/^data:(image\/\w+);base64,(.+)$/)
